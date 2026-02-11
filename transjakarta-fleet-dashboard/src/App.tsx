@@ -11,16 +11,11 @@ export default function App() {
   const [isMapView, setIsMapView] = useState(false);
   const [showErrorBanner, setShowErrorBanner] = useState(true);
 
-  // Dropdown Rute
+  // Dropdown refs
   const routeDropdownRef = useRef<HTMLDivElement>(null);
   const routeLoadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  // Dropdown Trip
   const tripDropdownRef = useRef<HTMLDivElement>(null);
   const tripLoadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  const hasMoreRouteRef = useRef(true);
-  const hasMoreTripRef = useRef(true);
 
   // Paginasi
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,17 +46,9 @@ export default function App() {
     loadMoreTrips,
   } = useTrips(tripRouteIds);
 
-  const visibleRoutes = useMemo(() => {
-    return routes;
-  }, [routes]);
-
-  const visibleTrips = useMemo(() => {
-    return trips;
-  }, [trips]);
-
   const tripGroups = useMemo(() => {
-    const groups = new Map<string, typeof visibleTrips>();
-    visibleTrips.forEach((trip) => {
+    const groups = new Map<string, typeof trips>();
+    trips.forEach((trip) => {
       const blockId = trip.attributes.block_id || "Tidak Ditugaskan";
       if (!groups.has(blockId)) {
         groups.set(blockId, []);
@@ -73,52 +60,40 @@ export default function App() {
       blockId,
       trips: groupedTrips,
     }));
-  }, [visibleTrips]);
+  }, [trips]);
 
-  // Lazy loading untuk rute
+  // Lazy load routes
   useEffect(() => {
-    hasMoreRouteRef.current = hasMoreRoutes;
     const trigger = routeLoadMoreTriggerRef.current;
     const dropdown = routeDropdownRef.current;
     if (!trigger || !dropdown) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && hasMoreRouteRef.current) {
+        if (entries[0].isIntersecting && hasMoreRoutes) {
           loadMoreRoutes();
         }
       },
-      {
-        root: dropdown,
-        rootMargin: "0px 0px 50px 0px",
-        threshold: 0,
-      },
+      { root: dropdown, rootMargin: "0px 0px 50px 0px", threshold: 0 },
     );
 
     observer.observe(trigger);
     return () => observer.disconnect();
   }, [hasMoreRoutes, loadMoreRoutes]);
 
-  // Lazy loading untuk trip
+  // Lazy load trips
   useEffect(() => {
-    hasMoreTripRef.current = hasMoreTrips;
     const trigger = tripLoadMoreTriggerRef.current;
     const dropdown = tripDropdownRef.current;
     if (!trigger || !dropdown) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && hasMoreTripRef.current) {
+        if (entries[0].isIntersecting && hasMoreTrips) {
           loadMoreTrips();
         }
       },
-      {
-        root: dropdown,
-        rootMargin: "0px 0px 50px 0px",
-        threshold: 0,
-      },
+      { root: dropdown, rootMargin: "0px 0px 50px 0px", threshold: 0 },
     );
 
     observer.observe(trigger);
@@ -127,14 +102,17 @@ export default function App() {
 
   // Logika Filter
   const filteredVehicles = useMemo(() => {
-    setCurrentPage(1);
-
     if (selectedRouteIds.length === 0) return vehicles;
 
     return vehicles.filter((v) =>
       selectedRouteIds.includes(v.relationships.route.data?.id || ""),
     );
   }, [vehicles, selectedRouteIds]);
+
+  // Reset pagination saat filter berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedRouteIds]);
 
   const toggleRoute = (id: string) => {
     setSelectedRouteIds((prev) =>
@@ -157,10 +135,7 @@ export default function App() {
   const totalPages = Math.ceil(totalItems / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalItems);
-
-  const currentVehicles = useMemo(() => {
-    return filteredVehicles.slice(startIndex, endIndex);
-  }, [filteredVehicles, startIndex, endIndex]);
+  const currentVehicles = filteredVehicles.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
@@ -223,7 +198,7 @@ export default function App() {
                     </button>
                   )}
 
-                  {visibleRoutes.map((route) => (
+                  {routes.map((route) => (
                     <label
                       key={route.id}
                       className="flex items-center gap-3 px-3 py-2 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors group/item"

@@ -11,6 +11,10 @@ interface VehicleCardProps {
   included: MBTAIncluded[];
 }
 
+// Helper to find included item by type and id
+const findIncluded = (included: MBTAIncluded[], type: string, id?: string) =>
+  id ? included.find((i) => i.type === type && i.id === id) : undefined;
+
 const VehicleCard = ({ vehicle, included }: VehicleCardProps) => {
   const { attributes, relationships } = vehicle;
 
@@ -20,33 +24,30 @@ const VehicleCard = ({ vehicle, included }: VehicleCardProps) => {
   );
   const isStale = minutesAgo >= 2;
 
-  // Mencari informasi rute
-  const routeId = relationships.route.data?.id;
-  const routeInfo = included.find(
-    (item): item is MBTARouteIncluded =>
-      item.type === "route" && item.id === routeId,
-  );
-
-  // Mencari informasi trip untuk mendapatkan tujuan
-  const tripId = relationships.trip.data?.id;
-  const tripInfo = included.find(
-    (item): item is MBTATripIncluded =>
-      item.type === "trip" && item.id === tripId,
-  );
-  const destination = tripInfo?.attributes.headsign || "Tujuan Tidak Diketahui";
-
-  // Mencari informasi lokasi saat ini (Nama Lokasi)
-  const stopId = relationships.stop.data?.id;
-  const stopInfo = included.find(
-    (item): item is MBTAStopIncluded =>
-      item.type === "stop" && item.id === stopId,
-  );
-  const stopName = stopInfo?.attributes.name || "Lokasi Tidak Diketahui";
+  // Find related data
+  const routeInfo = findIncluded(
+    included,
+    "route",
+    relationships.route.data?.id,
+  ) as MBTARouteIncluded | undefined;
+  const tripInfo = findIncluded(
+    included,
+    "trip",
+    relationships.trip.data?.id,
+  ) as MBTATripIncluded | undefined;
+  const stopInfo = findIncluded(
+    included,
+    "stop",
+    relationships.stop.data?.id,
+  ) as MBTAStopIncluded | undefined;
 
   const routeColor = routeInfo ? `#${routeInfo.attributes.color}` : "#003366";
   const textColor = routeInfo
     ? `#${routeInfo.attributes.text_color}`
     : "#FFFFFF";
+
+  const destination = tripInfo?.attributes.headsign || "Tujuan Tidak Diketahui";
+  const stopName = stopInfo?.attributes.name || "Lokasi Tidak Diketahui";
 
   // Formatter Status yang menyertakan Nama Lokasi
   const formatStatus = (status: string | null | undefined) => {

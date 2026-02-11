@@ -16,6 +16,13 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const DEFAULT_CENTER: [number, number] = [42.3601, -71.0589];
+
+const findIncluded = (type: string, id: string | undefined, included: any[]) => {
+  if (!id) return undefined;
+  return included.find((i) => i.type === type && i.id === id);
+};
+
 const createColoredIcon = (color: string) => {
   const svgHtml = `
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -51,7 +58,6 @@ function MapAutoBounds({
   selectedRouteIds: string[];
 }) {
   const map = useMap();
-  const defaultCenter: [number, number] = [42.3601, -71.0589];
 
   useEffect(() => {
     if (vehicles.length > 0) {
@@ -60,7 +66,7 @@ function MapAutoBounds({
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     } else if (selectedRouteIds.length > 0) {
-      map.setView(defaultCenter, 12, { animate: true });
+      map.setView(DEFAULT_CENTER, 12, { animate: true });
     }
   }, [selectedRouteIds, map]);
 
@@ -70,7 +76,6 @@ function MapAutoBounds({
 // Komponen RecenterButton - memungkinkan pengguna untuk memusatkan ulang peta
 function RecenterButton({ vehicles }: { vehicles: any[] }) {
   const map = useMap();
-  const defaultCenter: [number, number] = [42.3601, -71.0589];
 
   const handleRecenter = () => {
     if (vehicles.length > 0) {
@@ -79,7 +84,7 @@ function RecenterButton({ vehicles }: { vehicles: any[] }) {
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     } else {
-      map.setView(defaultCenter, 12, { animate: true });
+      map.setView(DEFAULT_CENTER, 12, { animate: true });
     }
   };
 
@@ -116,11 +121,9 @@ export default function FleetMap({
   included,
   selectedRouteIds,
 }: FleetMapProps) {
-  const defaultCenter: [number, number] = [42.3601, -71.0589];
-
   return (
     <div className="w-full h-[calc(100vh-300px)] rounded-2xl overflow-hidden shadow-lg border border-gray-200 z-0 relative">
-      <MapContainer center={defaultCenter} zoom={12} className="h-full w-full">
+      <MapContainer center={DEFAULT_CENTER} zoom={12} className="h-full w-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -135,20 +138,9 @@ export default function FleetMap({
         {vehicles.map((v) => {
           // Ekstrak data kendaraan dan informasi terkait
           const { attributes, relationships } = v;
-          const routeId = relationships.route.data?.id;
-          const routeInfo = included.find(
-            (i) => i.type === "route" && i.id === routeId,
-          );
-
-          const tripId = relationships.trip.data?.id;
-          const tripInfo = included.find(
-            (i) => i.type === "trip" && i.id === tripId,
-          );
-
-          const stopId = relationships.stop.data?.id;
-          const stopInfo = included.find(
-            (i) => i.type === "stop" && i.id === stopId,
-          );
+          const routeInfo = findIncluded("route", relationships.route.data?.id, included);
+          const tripInfo = findIncluded("trip", relationships.trip.data?.id, included);
+          const stopInfo = findIncluded("stop", relationships.stop.data?.id, included);
           const stopName =
             stopInfo?.attributes.name || "Lokasi Tidak Diketahui";
 
