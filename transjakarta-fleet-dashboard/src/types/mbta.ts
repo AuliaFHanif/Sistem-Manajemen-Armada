@@ -87,6 +87,30 @@ export interface MBTARouteResponse {
   };
 }
 
+export interface MBTATrip {
+  id: string;
+  type: "trip";
+  attributes: {
+    name: string;
+    headsign: string;
+    direction_id: number;
+    route_id: string;
+    block_id: string | null;
+  };
+  relationships: {
+    route: { data: { id: string; type: "route" } };
+  };
+}
+
+export interface MBTATripResponse {
+  data: MBTATrip[];
+  links: {
+    first: string;
+    last: string;
+    next?: string;
+  };
+}
+
 export interface MBTAStopIncluded {
   type: "stop";
   id: string;
