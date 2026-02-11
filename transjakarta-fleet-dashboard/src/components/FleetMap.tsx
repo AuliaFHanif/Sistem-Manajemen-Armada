@@ -4,10 +4,10 @@ import { useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// --- Leaflet Icon Fix for React/Vite ---
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
+// Perbaiki ikon Leaflet default yang hilang di Vite
 let DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
@@ -16,7 +16,6 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// NEW: Helper to create a colored SVG icon matching your UI
 const createColoredIcon = (color: string) => {
   const svgHtml = `
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -40,49 +39,46 @@ const createColoredIcon = (color: string) => {
 interface FleetMapProps {
   vehicles: any[];
   included: any[];
-  selectedRouteId: string;
+  selectedRouteIds: string[];
 }
 
+// Komponen MapAutoBounds - untuk otomatis menyesuaikan batas peta ke kendaraan
 function MapAutoBounds({
   vehicles,
-  selectedRouteId,
+  selectedRouteIds,
 }: {
   vehicles: any[];
-  selectedRouteId: string;
+  selectedRouteIds: string[];
 }) {
   const map = useMap();
   const defaultCenter: [number, number] = [42.3601, -71.0589];
 
   useEffect(() => {
-    // LOGIC: If we have vehicles, zoom to fit them
     if (vehicles.length > 0) {
       const bounds = L.latLngBounds(
         vehicles.map((v) => [v.attributes.latitude, v.attributes.longitude]),
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    }
-    // LOGIC: If no vehicles found for a specific route, reset to city view
-    else if (selectedRouteId !== "") {
+    } else if (selectedRouteIds.length > 0) {
       map.setView(defaultCenter, 12, { animate: true });
     }
-  }, [selectedRouteId, map]); // Only trigger on route change
+  }, [selectedRouteIds, map]);
 
   return null;
 }
 
+// Komponen RecenterButton - memungkinkan pengguna untuk memusatkan ulang peta
 function RecenterButton({ vehicles }: { vehicles: any[] }) {
   const map = useMap();
   const defaultCenter: [number, number] = [42.3601, -71.0589];
 
   const handleRecenter = () => {
     if (vehicles.length > 0) {
-      // If there are vehicles, zoom to fit them
       const bounds = L.latLngBounds(
         vehicles.map((v) => [v.attributes.latitude, v.attributes.longitude]),
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     } else {
-      // Otherwise, go back to the default city view
       map.setView(defaultCenter, 12, { animate: true });
     }
   };
@@ -93,9 +89,8 @@ function RecenterButton({ vehicles }: { vehicles: any[] }) {
         <button
           onClick={handleRecenter}
           className="bg-white hover:bg-gray-50 text-[#003366] p-3 rounded-full shadow-2xl border border-gray-200 flex items-center justify-center transition-all active:scale-90 group"
-          title="Recenter Map"
+          title="Pusatkan Ulang Peta"
         >
-          {/* A simple 'Target' icon using SVG */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6 group-hover:scale-110 transition-transform"
@@ -119,51 +114,141 @@ function RecenterButton({ vehicles }: { vehicles: any[] }) {
 export default function FleetMap({
   vehicles,
   included,
-  selectedRouteId,
+  selectedRouteIds,
 }: FleetMapProps) {
   const defaultCenter: [number, number] = [42.3601, -71.0589];
 
   return (
-    <div className="w-full h-[calc(100vh-300px)] rounded-2xl overflow-hidden shadow-lg border border-gray-200">
+    <div className="w-full h-[calc(100vh-300px)] rounded-2xl overflow-hidden shadow-lg border border-gray-200 z-0 relative">
       <MapContainer center={defaultCenter} zoom={12} className="h-full w-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* ADD THIS HERE: It listens to vehicle changes and moves the camera */}
-        <MapAutoBounds vehicles={vehicles} selectedRouteId={selectedRouteId} />
+        <MapAutoBounds
+          vehicles={vehicles}
+          selectedRouteIds={selectedRouteIds}
+        />
         <RecenterButton vehicles={vehicles} />
+
         {vehicles.map((v) => {
-          const routeId = v.relationships.route.data?.id;
-          const route = included.find(
+          // Ekstrak data kendaraan dan informasi terkait
+          const { attributes, relationships } = v;
+          const routeId = relationships.route.data?.id;
+          const routeInfo = included.find(
             (i) => i.type === "route" && i.id === routeId,
           );
-          const color = route?.attributes.color
-            ? `#${route.attributes.color}`
+
+          const tripId = relationships.trip.data?.id;
+          const tripInfo = included.find(
+            (i) => i.type === "trip" && i.id === tripId,
+          );
+
+          const stopId = relationships.stop.data?.id;
+          const stopInfo = included.find(
+            (i) => i.type === "stop" && i.id === stopId,
+          );
+          const stopName =
+            stopInfo?.attributes.name || "Lokasi Tidak Diketahui";
+
+          const color = routeInfo?.attributes.color
+            ? `#${routeInfo.attributes.color}`
             : "#003366";
           const position: [number, number] = [
-            v.attributes.latitude,
-            v.attributes.longitude,
+            attributes.latitude,
+            attributes.longitude,
           ];
+
+          const formatStatus = (status: string | null) => {
+            if (!status) return "Tidak Diketahui";
+            return (
+              status
+                .toLowerCase()
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase()) + `: ${stopName}`
+            );
+          };
 
           return (
             <Marker
               key={v.id}
               position={position}
               icon={createColoredIcon(color)}
-              // NEW: Zoom in when the marker is clicked
               eventHandlers={{
                 click: (e) => {
+                  // Saat penanda diklik, animasi peta ke posisi dengan offset kamera
                   const map = e.target._map;
-                  map.flyTo(position, 16, {
-                    // 16 is a close-up zoom level
+
+                  const { lat, lng } = e.target.getLatLng();
+
+                  const cameraOffset = 0.006;
+                  const targetPosition: [number, number] = [
+                    lat + cameraOffset,
+                    lng,
+                  ];
+
+                  map.flyTo(targetPosition, 15, {
                     duration: 1.5,
+                    easeLinearity: 0.25,
                   });
                 },
               }}
             >
-              <Popup>{/* Your existing popup content */}</Popup>
+              <Popup minWidth={260} maxWidth={260}>
+                <div className="p-1 font-sans w-full flex flex-col gap-3">
+                  {/* Kepala */}
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                      Status & Lokasi
+                    </p>
+                    <p className="text-sm font-black text-gray-800 leading-tight line-clamp-2 italic">
+                      {formatStatus(attributes.current_status)}
+                    </p>
+                  </div>
+
+                  {/* Grid Koordinat */}
+                  <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="border-r border-gray-200">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">
+                        Lintang
+                      </p>
+                      <p className="text-xs font-mono font-bold text-blue-600">
+                        {attributes.latitude.toFixed(5)}
+                      </p>
+                    </div>
+                    <div className="pl-1">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase">
+                        Bujur
+                      </p>
+                      <p className="text-xs font-mono font-bold text-blue-600">
+                        {attributes.longitude.toFixed(5)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Rute/Trip */}
+                  <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                    <p className="text-[9px] font-bold text-blue-400 uppercase mb-1">
+                      Rute & Tujuan
+                    </p>
+                    <p className="text-xs font-bold text-[#003366] truncate">
+                      {routeInfo?.attributes.long_name}
+                    </p>
+                    <p className="text-[10px] text-blue-700 font-medium truncate">
+                      Tujuan Berikutnya: {tripInfo?.attributes.headsign}
+                    </p>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[9px] text-gray-400">
+                    <span>
+                      Pembaruan:{" "}
+                      {new Date(attributes.updated_at).toLocaleTimeString()}
+                    </span>
+                    <span className="font-bold">ID: {v.id}</span>
+                  </div>
+                </div>
+              </Popup>
             </Marker>
           );
         })}
