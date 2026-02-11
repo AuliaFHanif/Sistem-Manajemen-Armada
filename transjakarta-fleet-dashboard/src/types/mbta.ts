@@ -41,7 +41,10 @@ export interface MBTATripIncluded {
   };
 }
 
-export type MBTAIncluded = MBTARouteIncluded | MBTATripIncluded;
+export type MBTAIncluded =
+  | MBTARouteIncluded
+  | MBTATripIncluded
+  | MBTAStopIncluded;
 
 export interface MBTADataResponse {
   data: MBTAVehicle[];
@@ -53,7 +56,7 @@ export interface MBTADataResponse {
     prev?: string;
   };
 
-  jsonapi?: { version: string }; 
+  jsonapi?: { version: string };
 }
 
 export interface MBTARoute {
@@ -81,5 +84,19 @@ export interface MBTARouteResponse {
     first: string;
     last: string;
     next?: string;
+  };
+}
+
+export interface MBTAStopIncluded {
+  type: "stop";
+  id: string;
+  attributes: {
+    name: string;
+    latitude: number;
+    longitude: number;
+    platform_code: string | null;
+    platform_name: string | null;
+    address: string | null;
+    description: string | null;
   };
 }
