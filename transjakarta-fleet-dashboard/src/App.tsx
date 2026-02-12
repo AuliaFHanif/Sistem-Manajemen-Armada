@@ -1,32 +1,44 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useVehicles } from "./hooks/useVehicles";
 import { useRoutes } from "./hooks/useRoutes";
-import { useTrips } from "./hooks/useTrips";
+import { useHeadsigns } from "./hooks/useHeadsigns";
 import VehicleCard from "./components/VehicleCard";
 import FleetMap from "./components/FleetMap";
+import type { TripPattern } from "./types/mbta";
 
 export default function App() {
   const [selectedRouteIds, setSelectedRouteIds] = useState<string[]>([]);
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
+  const [selectedPattern, setSelectedPattern] = useState<TripPattern | null>(
+    null,
+  );
   const [isMapView, setIsMapView] = useState(false);
   const [showErrorBanner, setShowErrorBanner] = useState(true);
 
   // Dropdown refs
   const routeDropdownRef = useRef<HTMLDivElement>(null);
   const routeLoadMoreTriggerRef = useRef<HTMLDivElement>(null);
-  const tripDropdownRef = useRef<HTMLDivElement>(null);
-  const tripLoadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const patternDropdownRef = useRef<HTMLDivElement>(null);
 
   // Paginasi
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Hook 1: All vehicles for the selected routes (for counting patterns)
+  const { vehicles: allVehicles } = useVehicles(
+    500,
+    selectedRouteIds,
+    [],
+    false, // Don't apply trip filter - get ALL vehicles for routes
+  );
+
+  // Hook 2: Filtered vehicles (for display)
   const {
     vehicles,
     included,
     loading: vehiclesLoading,
     error: vehiclesError,
-  } = useVehicles(1000, selectedRouteIds, selectedTripIds);
+  } = useVehicles(500, selectedRouteIds, selectedTripIds, true); // Apply trip filter
   const {
     routes,
     loading: routesLoading,
@@ -34,33 +46,63 @@ export default function App() {
     hasMore: hasMoreRoutes,
     loadMoreRoutes,
   } = useRoutes();
-  const tripRouteIds = useMemo(
-    () => (selectedRouteIds.length > 0 ? selectedRouteIds : []),
-    [selectedRouteIds],
-  );
   const {
-    trips,
-    loading: tripsLoading,
-    error: tripsError,
-    hasMore: hasMoreTrips,
-    loadMoreTrips,
-  } = useTrips(tripRouteIds);
+    patterns,
+    loading: patternsLoading,
+    error: patternsError,
+  } = useHeadsigns(selectedRouteIds);
 
-  const tripGroups = useMemo(() => {
-    const groups = new Map<string, typeof trips>();
-    trips.forEach((trip) => {
-      const blockId = trip.attributes.block_id || "Tidak Ditugaskan";
-      if (!groups.has(blockId)) {
-        groups.set(blockId, []);
-      }
-      groups.get(blockId)?.push(trip);
-    });
-
-    return Array.from(groups.entries()).map(([blockId, groupedTrips]) => ({
-      blockId,
-      trips: groupedTrips,
+  // Calculate active counts using ALL vehicles, not filtered ones
+  const patternsWithCounts = useMemo(() => {
+    const patternsWithCount = patterns.map((pattern) => ({
+      ...pattern,
+      activeCount: allVehicles.filter((v) =>
+        pattern.tripIds.includes(v.relationships.trip.data?.id || ""),
+      ).length,
     }));
-  }, [trips]);
+
+    // Find vehicles with non-revenue trips
+    const nonRevenueVehicles = allVehicles.filter((v) => {
+      const tripId = v.relationships.trip.data?.id;
+      return tripId && tripId.startsWith("NONREV");
+    });
+    const nonRevenueCount = nonRevenueVehicles.length;
+
+    // Count vehicles with no trip assigned
+    const noTripCount = allVehicles.filter(
+      (v) => !v.relationships.trip.data?.id,
+    ).length;
+
+    let result = [...patternsWithCount];
+
+    // Add "Non-Revenue Trip" option if there are vehicles without trip
+    if (nonRevenueCount > 0) {
+      result.push({
+        headsign: "Non-Revenue",
+        direction_id: -2,
+        route_id: selectedRouteIds[0] || "",
+        displayName: "Non-Revenue (Deadheading)",
+        tripIds: nonRevenueVehicles.map((v) => v.id), // Use vehicle IDs as special markers
+        activeCount: nonRevenueCount,
+        isNoTrip: true,
+      });
+    }
+
+    // Add "No Active Trip" option if there are vehicles without trips
+    if (noTripCount > 0) {
+      result.push({
+        headsign: "No Active Trip",
+        direction_id: -1,
+        route_id: selectedRouteIds[0] || "",
+        displayName: "Tidak Ada Trip Aktif",
+        tripIds: [],
+        activeCount: noTripCount,
+        isNoTrip: true,
+      });
+    }
+
+    return result;
+  }, [patterns, allVehicles, selectedRouteIds]);
 
   // Lazy load routes
   useEffect(() => {
@@ -81,25 +123,6 @@ export default function App() {
     return () => observer.disconnect();
   }, [hasMoreRoutes, loadMoreRoutes]);
 
-  // Lazy load trips
-  useEffect(() => {
-    const trigger = tripLoadMoreTriggerRef.current;
-    const dropdown = tripDropdownRef.current;
-    if (!trigger || !dropdown) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMoreTrips) {
-          loadMoreTrips();
-        }
-      },
-      { root: dropdown, rootMargin: "0px 0px 50px 0px", threshold: 0 },
-    );
-
-    observer.observe(trigger);
-    return () => observer.disconnect();
-  }, [hasMoreTrips, loadMoreTrips]);
-
   // Logika Filter
   const filteredVehicles = useMemo(() => {
     if (selectedRouteIds.length === 0) return vehicles;
@@ -112,7 +135,7 @@ export default function App() {
   // Reset pagination saat filter berubah
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedRouteIds]);
+  }, [selectedRouteIds, selectedTripIds]);
 
   const toggleRoute = (id: string) => {
     setSelectedRouteIds((prev) =>
@@ -122,12 +145,24 @@ export default function App() {
     );
   };
 
-  const toggleTrip = (id: string) => {
-    setSelectedTripIds((prev) =>
-      prev.includes(id)
-        ? prev.filter((tripId) => tripId !== id)
-        : [...prev, id],
-    );
+  const selectPattern = (pattern: TripPattern) => {
+    setSelectedPattern(pattern);
+    if (pattern.isNoTrip) {
+      if (pattern.direction_id === -2) {
+        // Non-revenue trips
+        setSelectedTripIds(["NONREV"]);
+      } else {
+        // No trip assigned
+        setSelectedTripIds(["NO_TRIP"]);
+      }
+    } else {
+      setSelectedTripIds(pattern.tripIds);
+    }
+  };
+
+  const clearPattern = () => {
+    setSelectedPattern(null);
+    setSelectedTripIds([]);
   };
 
   // Logika Paginasi
@@ -238,12 +273,10 @@ export default function App() {
             <div className="relative group w-full md:w-72">
               <button
                 className="bg-white text-gray-900 text-sm rounded-lg flex items-center justify-between w-full p-2.5 outline-none shadow-inner"
-                disabled={tripsLoading || selectedRouteIds.length === 0}
+                disabled={patternsLoading || selectedRouteIds.length === 0}
               >
                 <span className="truncate">
-                  {selectedTripIds.length === 0
-                    ? "Semua Trip"
-                    : `${selectedTripIds.length} Trip Dipilih`}
+                  {selectedTripIds.length === 0 ? "Semua Trip" : "Trip Dipilih"}
                 </span>
                 <svg
                   className="w-4 h-4 ml-2 text-gray-400"
@@ -262,7 +295,7 @@ export default function App() {
 
               {/* Konten Dropdown */}
               <div
-                ref={tripDropdownRef}
+                ref={patternDropdownRef}
                 className="absolute right-0 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-9999 max-h-80 overflow-y-auto"
                 style={{ overscrollBehavior: "contain" }}
               >
@@ -274,52 +307,41 @@ export default function App() {
                   )}
                   {selectedTripIds.length > 0 && (
                     <button
-                      onClick={() => setSelectedTripIds([])}
+                      onClick={clearPattern}
                       className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg border-b mb-1"
                     >
                       Hapus Pilihan
                     </button>
                   )}
 
-                  {tripGroups.map((group) => (
-                    <div key={group.blockId} className="mb-2">
-                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                        Blok {group.blockId}
-                      </div>
-                      {group.trips.map((trip) => (
-                        <label
-                          key={trip.id}
-                          className="flex items-center gap-3 px-3 py-2 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors group/item"
-                        >
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-[#003366] rounded border-gray-300 focus:ring-[#003366]"
-                            checked={selectedTripIds.includes(trip.id)}
-                            onChange={() => toggleTrip(trip.id)}
-                          />
-                          <span
-                            className={`text-sm ${selectedTripIds.includes(trip.id) ? "font-bold text-[#003366]" : "text-gray-700"}`}
-                          >
-                            {trip.attributes.headsign || trip.attributes.name}
-                            <span className="text-[10px] text-gray-400 block">
-                              {trip.attributes.name || "Tanpa nama pendek"} • ID{" "}
-                              {trip.id}
-                            </span>
-                          </span>
-                        </label>
-                      ))}
+                  {patternsLoading ? (
+                    <div className="px-3 py-2 text-xs text-gray-400 text-center">
+                      Memuat trip...
                     </div>
-                  ))}
-
-                  {hasMoreTrips && (
-                    <div
-                      ref={tripLoadMoreTriggerRef}
-                      className="p-3 text-center"
-                    >
-                      <span className="text-xs text-gray-400 font-bold animate-pulse uppercase tracking-widest">
-                        Memuat Lagi...
-                      </span>
+                  ) : patternsWithCounts.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-gray-400">
+                      Tidak ada trip ditemukan.
                     </div>
+                  ) : (
+                    patternsWithCounts.map((pattern) => (
+                      <button
+                        key={`${pattern.headsign}-${pattern.direction_id}`}
+                        onClick={() => selectPattern(pattern)}
+                        className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
+                          selectedTripIds.length > 0 &&
+                          selectedTripIds.every((id) =>
+                            pattern.tripIds.includes(id),
+                          )
+                            ? "bg-blue-100 text-[#003366] font-bold"
+                            : "hover:bg-blue-50 text-gray-700"
+                        }`}
+                      >
+                        <span className="text-sm">{pattern.displayName}</span>
+                        <span className="text-xs bg-blue-600 text-white rounded-full px-2 py-0.5 ml-2 whitespace-nowrap">
+                          {pattern.activeCount} aktif
+                        </span>
+                      </button>
+                    ))
                   )}
                 </div>
               </div>
@@ -330,13 +352,13 @@ export default function App() {
 
       {/* DASBOR */}
       <main className="w-full px-8 py-10 grow">
-        {showErrorBanner && (vehiclesError || routesError || tripsError) && (
+        {showErrorBanner && (vehiclesError || routesError || patternsError) && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-start justify-between gap-4">
             <div>
               <div className="font-bold mb-2">Error API</div>
               {vehiclesError && <div>Kendaraan: {vehiclesError}</div>}
               {routesError && <div>Rute: {routesError}</div>}
-              {tripsError && <div>Trip: {tripsError}</div>}
+              {patternsError && <div>Trip: {patternsError}</div>}
             </div>
             <button
               type="button"

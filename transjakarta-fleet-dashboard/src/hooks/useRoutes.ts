@@ -15,7 +15,12 @@ export const useRoutes = () => {
       const response = await mbtaService.fetchRoutes(itemsPerPage, offset);
       const newRoutes = response.data || [];
 
-      setRoutes((prev) => [...prev, ...newRoutes]);
+      setRoutes((prev) => {
+        // Deduplicate by route ID
+        const existingIds = new Set(prev.map((r) => r.id));
+        const uniqueNewRoutes = newRoutes.filter((r) => !existingIds.has(r.id));
+        return [...prev, ...uniqueNewRoutes];
+      });
 
       // Periksa apakah ada lebih banyak rute yang akan diambil
       if (newRoutes.length < itemsPerPage) {

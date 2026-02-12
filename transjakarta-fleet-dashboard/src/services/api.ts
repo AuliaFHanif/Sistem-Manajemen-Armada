@@ -117,4 +117,39 @@ export const mbtaService = {
       throw error;
     }
   },
+
+  // Ambil kendaraan yang difilter berdasarkan headsign dan direction_id
+  fetchVehiclesByHeadsign: async (
+    routeIds: string[],
+    headsign: string,
+    directionId: number,
+  ): Promise<MBTADataResponse> => {
+    if (routeIds.length === 0) {
+      return mbtaService.fetchVehicles(500);
+    }
+
+    const routeFilter = routeIds.join(",");
+    const url = `${BASE_URL}/vehicles?filter[route]=${routeFilter}&filter[direction_id]=${directionId}&page[limit]=500&include=route,trip,stop`;
+
+    try {
+      const response = await fetchJson<MBTADataResponse>(url);
+
+      // Filter by headsign on the client side (API doesn't support headsign filter)
+      const filtered = {
+        ...response,
+        data: response.data.filter((vehicle) => {
+          const tripInfo = response.included?.find(
+            (i) =>
+              i.type === "trip" && i.id === vehicle.relationships.trip.data?.id,
+          );
+          return (tripInfo as any)?.attributes.headsign === headsign;
+        }),
+      };
+
+      return filtered;
+    } catch (error) {
+      console.error("Failed to fetch vehicles by headsign:", error);
+      throw error;
+    }
+  },
 };

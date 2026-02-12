@@ -124,3 +124,13 @@ export interface MBTAStopIncluded {
     description: string | null;
   };
 }
+
+export interface TripPattern {
+  headsign: string;
+  direction_id: number;
+  route_id: string;
+  displayName: string;
+  tripIds: string[];
+  activeCount?: number;
+  isNoTrip?: boolean;
+}
