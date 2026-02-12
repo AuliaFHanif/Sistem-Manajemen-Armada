@@ -11,20 +11,20 @@ interface VehicleCardProps {
   included: MBTAIncluded[];
 }
 
-// Helper to find included item by type and id
+// Pembantu untuk mencari item yang disertakan berdasarkan tipe dan id
 const findIncluded = (included: MBTAIncluded[], type: string, id?: string) =>
   id ? included.find((i) => i.type === type && i.id === id) : undefined;
 
 const VehicleCard = ({ vehicle, included }: VehicleCardProps) => {
   const { attributes, relationships } = vehicle;
 
-  // Cek apakah data sudah usang
+  // Periksa apakah data sudah usang
   const minutesAgo = Math.floor(
     (new Date().getTime() - new Date(attributes.updated_at).getTime()) / 60000,
   );
   const isStale = minutesAgo >= 2;
 
-  // Find related data
+  // Cari data terkait
   const routeInfo = findIncluded(
     included,
     "route",
@@ -49,7 +49,7 @@ const VehicleCard = ({ vehicle, included }: VehicleCardProps) => {
   const destination = tripInfo?.attributes.headsign || "Tujuan Tidak Diketahui";
   const stopName = stopInfo?.attributes.name || "Lokasi Tidak Diketahui";
 
-  // Formatter Status yang menyertakan Nama Lokasi
+  // Pemformat Status yang menyertakan Nama Lokasi
   const formatStatus = (status: string | null | undefined) => {
     if (!status) return "Tidak Diketahui";
     const statusText = status

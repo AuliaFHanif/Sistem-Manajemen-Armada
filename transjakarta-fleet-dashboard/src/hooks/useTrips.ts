@@ -48,7 +48,6 @@ export const useTrips = (routeIds: string[] = []) => {
   }, [offset, routeIds]);
 
   useEffect(() => {
-    // Reset state saat rute berubah
     setTrips([]);
     setOffset(0);
     setHasMore(true);
@@ -73,7 +72,6 @@ export const useTrips = (routeIds: string[] = []) => {
         setTrips(mergeUniqueTrips([], initialTrips));
         setError(null);
 
-        // Periksa apakah ada lebih banyak trip yang akan diambil
         if (initialTrips.length < itemsPerPage) {
           setHasMore(false);
         } else {

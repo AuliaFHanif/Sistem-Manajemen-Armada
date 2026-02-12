@@ -52,7 +52,6 @@ export const mbtaService = {
       return mbtaService.fetchVehicles(500);
     }
 
-    // Gabungkan ID rute untuk filter
     const routeFilter = routeIds.join(",");
     const url = `${BASE_URL}/vehicles?filter[route]=${routeFilter}&page[limit]=500&include=route,trip,stop`;
 
@@ -84,9 +83,7 @@ export const mbtaService = {
     limit: number = 10,
     offset: number = 0,
   ): Promise<MBTATripResponse> => {
-    // API MBTA memerlukan filter[route] untuk mengambil trip
     if (routeIds.length === 0) {
-      // Tidak bisa mengambil trip tanpa rute
       return { data: [], links: { first: "", last: "" } };
     }
 
@@ -106,7 +103,6 @@ export const mbtaService = {
       return mbtaService.fetchVehicles(500);
     }
 
-    // Gabungkan ID trip untuk filter
     const tripFilter = tripIds.join(",");
     const url = `${BASE_URL}/vehicles?filter[trip]=${tripFilter}&page[limit]=500&include=route,trip,stop`;
 
@@ -134,7 +130,6 @@ export const mbtaService = {
     try {
       const response = await fetchJson<MBTADataResponse>(url);
 
-      // Filter by headsign on the client side (API doesn't support headsign filter)
       const filtered = {
         ...response,
         data: response.data.filter((vehicle) => {
@@ -148,7 +143,10 @@ export const mbtaService = {
 
       return filtered;
     } catch (error) {
-      console.error("Failed to fetch vehicles by headsign:", error);
+      console.error(
+        "Gagal mengambil data kendaraan berdasarkan headsign:",
+        error,
+      );
       throw error;
     }
   },

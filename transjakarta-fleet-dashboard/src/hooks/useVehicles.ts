@@ -21,16 +21,15 @@ export const useVehicles = (
 
         let response;
 
-        // Handle special "no trip" filter
+        // Tangani filter khusus "tidak ada trip"
         if (applyTripFilter && tripIds.includes("NO_TRIP")) {
-          // Get all vehicles for route, then filter client-side for no trip
           response = await mbtaService.fetchVehiclesByRoute(routeIds);
           response = {
             ...response,
             data: response.data.filter((v) => !v.relationships.trip.data?.id),
           };
         } else if (applyTripFilter && tripIds.includes("NONREV")) {
-          // Handle non-revenue trips filter
+          // Tangani filter trip non-revenue
           response = await mbtaService.fetchVehiclesByRoute(routeIds);
           response = {
             ...response,

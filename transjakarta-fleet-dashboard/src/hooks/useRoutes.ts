@@ -16,13 +16,11 @@ export const useRoutes = () => {
       const newRoutes = response.data || [];
 
       setRoutes((prev) => {
-        // Deduplicate by route ID
         const existingIds = new Set(prev.map((r) => r.id));
         const uniqueNewRoutes = newRoutes.filter((r) => !existingIds.has(r.id));
         return [...prev, ...uniqueNewRoutes];
       });
 
-      // Periksa apakah ada lebih banyak rute yang akan diambil
       if (newRoutes.length < itemsPerPage) {
         setHasMore(false);
       } else {
@@ -47,7 +45,6 @@ export const useRoutes = () => {
         setRoutes(initialRoutes);
         setError(null);
 
-        // Periksa apakah ada lebih banyak rute yang akan diambil
         if (initialRoutes.length < itemsPerPage) {
           setHasMore(false);
         } else {

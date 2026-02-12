@@ -7,7 +7,6 @@ import "leaflet/dist/leaflet.css";
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-// Perbaiki ikon Leaflet default yang hilang di Vite
 let DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
@@ -18,7 +17,11 @@ L.Marker.prototype.options.icon = DefaultIcon;
 
 const DEFAULT_CENTER: [number, number] = [42.3601, -71.0589];
 
-const findIncluded = (type: string, id: string | undefined, included: any[]) => {
+const findIncluded = (
+  type: string,
+  id: string | undefined,
+  included: any[],
+) => {
   if (!id) return undefined;
   return included.find((i) => i.type === type && i.id === id);
 };
@@ -49,7 +52,6 @@ interface FleetMapProps {
   selectedRouteIds: string[];
 }
 
-// Komponen MapAutoBounds - untuk otomatis menyesuaikan batas peta ke kendaraan
 function MapAutoBounds({
   vehicles,
   selectedRouteIds,
@@ -73,7 +75,6 @@ function MapAutoBounds({
   return null;
 }
 
-// Komponen RecenterButton - memungkinkan pengguna untuk memusatkan ulang peta
 function RecenterButton({ vehicles }: { vehicles: any[] }) {
   const map = useMap();
 
@@ -136,11 +137,22 @@ export default function FleetMap({
         <RecenterButton vehicles={vehicles} />
 
         {vehicles.map((v) => {
-          // Ekstrak data kendaraan dan informasi terkait
           const { attributes, relationships } = v;
-          const routeInfo = findIncluded("route", relationships.route.data?.id, included);
-          const tripInfo = findIncluded("trip", relationships.trip.data?.id, included);
-          const stopInfo = findIncluded("stop", relationships.stop.data?.id, included);
+          const routeInfo = findIncluded(
+            "route",
+            relationships.route.data?.id,
+            included,
+          );
+          const tripInfo = findIncluded(
+            "trip",
+            relationships.trip.data?.id,
+            included,
+          );
+          const stopInfo = findIncluded(
+            "stop",
+            relationships.stop.data?.id,
+            included,
+          );
           const stopName =
             stopInfo?.attributes.name || "Lokasi Tidak Diketahui";
 
@@ -169,7 +181,6 @@ export default function FleetMap({
               icon={createColoredIcon(color)}
               eventHandlers={{
                 click: (e) => {
-                  // Saat penanda diklik, animasi peta ke posisi dengan offset kamera
                   const map = e.target._map;
 
                   const { lat, lng } = e.target.getLatLng();

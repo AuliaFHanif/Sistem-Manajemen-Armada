@@ -9,36 +9,33 @@ import type { TripPattern } from "./types/mbta";
 export default function App() {
   const [selectedRouteIds, setSelectedRouteIds] = useState<string[]>([]);
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
-  const [selectedPattern, setSelectedPattern] = useState<TripPattern | null>(
-    null,
-  );
   const [isMapView, setIsMapView] = useState(false);
   const [showErrorBanner, setShowErrorBanner] = useState(true);
 
-  // Dropdown refs
+  // Referensi dropdown
   const routeDropdownRef = useRef<HTMLDivElement>(null);
   const routeLoadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const patternDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Paginasi
+  // Variabel paginasi
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Hook 1: All vehicles for the selected routes (for counting patterns)
+  // Hook 1: Semua kendaraan untuk rute yang dipilih
   const { vehicles: allVehicles } = useVehicles(
     500,
     selectedRouteIds,
     [],
-    false, // Don't apply trip filter - get ALL vehicles for routes
+    false,
   );
 
-  // Hook 2: Filtered vehicles (for display)
+  // Hook 2: Kendaraan yang difilter (untuk ditampilkan)
   const {
     vehicles,
     included,
     loading: vehiclesLoading,
     error: vehiclesError,
-  } = useVehicles(500, selectedRouteIds, selectedTripIds, true); // Apply trip filter
+  } = useVehicles(500, selectedRouteIds, selectedTripIds, true);
   const {
     routes,
     loading: routesLoading,
@@ -52,7 +49,7 @@ export default function App() {
     error: patternsError,
   } = useHeadsigns(selectedRouteIds);
 
-  // Calculate active counts using ALL vehicles, not filtered ones
+  // Hitung jumlah aktif menggunakan SEMUA kendaraan, bukan yang sudah difilter
   const patternsWithCounts = useMemo(() => {
     const patternsWithCount = patterns.map((pattern) => ({
       ...pattern,
@@ -61,34 +58,34 @@ export default function App() {
       ).length,
     }));
 
-    // Find vehicles with non-revenue trips
+    // Cari kendaraan dengan trip non-revenue
     const nonRevenueVehicles = allVehicles.filter((v) => {
       const tripId = v.relationships.trip.data?.id;
       return tripId && tripId.startsWith("NONREV");
     });
     const nonRevenueCount = nonRevenueVehicles.length;
 
-    // Count vehicles with no trip assigned
+    // Hitung kendaraan tanpa trip aktif
     const noTripCount = allVehicles.filter(
       (v) => !v.relationships.trip.data?.id,
     ).length;
 
     let result = [...patternsWithCount];
 
-    // Add "Non-Revenue Trip" option if there are vehicles without trip
+    // Tambahkan opsi "Trip Non-Revenue" jika ada kendaraan tanpa trip aktif
     if (nonRevenueCount > 0) {
       result.push({
         headsign: "Non-Revenue",
         direction_id: -2,
         route_id: selectedRouteIds[0] || "",
         displayName: "Non-Revenue (Deadheading)",
-        tripIds: nonRevenueVehicles.map((v) => v.id), // Use vehicle IDs as special markers
+        tripIds: nonRevenueVehicles.map((v) => v.id),
         activeCount: nonRevenueCount,
         isNoTrip: true,
       });
     }
 
-    // Add "No Active Trip" option if there are vehicles without trips
+    // Tambahkan opsi "Tidak Ada Trip Aktif" jika ada kendaraan tanpa trip
     if (noTripCount > 0) {
       result.push({
         headsign: "No Active Trip",
@@ -104,7 +101,7 @@ export default function App() {
     return result;
   }, [patterns, allVehicles, selectedRouteIds]);
 
-  // Lazy load routes
+  // Muat rute secara lazy loading
   useEffect(() => {
     const trigger = routeLoadMoreTriggerRef.current;
     const dropdown = routeDropdownRef.current;
@@ -123,7 +120,7 @@ export default function App() {
     return () => observer.disconnect();
   }, [hasMoreRoutes, loadMoreRoutes]);
 
-  // Logika Filter
+  // Logika filter kendaraan
   const filteredVehicles = useMemo(() => {
     if (selectedRouteIds.length === 0) return vehicles;
 
@@ -132,7 +129,7 @@ export default function App() {
     );
   }, [vehicles, selectedRouteIds]);
 
-  // Reset pagination saat filter berubah
+  // Reset paginasi saat filter berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedRouteIds, selectedTripIds]);
@@ -146,13 +143,10 @@ export default function App() {
   };
 
   const selectPattern = (pattern: TripPattern) => {
-    setSelectedPattern(pattern);
     if (pattern.isNoTrip) {
       if (pattern.direction_id === -2) {
-        // Non-revenue trips
         setSelectedTripIds(["NONREV"]);
       } else {
-        // No trip assigned
         setSelectedTripIds(["NO_TRIP"]);
       }
     } else {
@@ -161,11 +155,10 @@ export default function App() {
   };
 
   const clearPattern = () => {
-    setSelectedPattern(null);
     setSelectedTripIds([]);
   };
 
-  // Logika Paginasi
+  // Logika paginasi
   const totalItems = filteredVehicles.length;
   const totalPages = Math.ceil(totalItems / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
@@ -174,7 +167,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
-      {/* KEPALA */}
+      {/* HEADER */}
       <header className="bg-[#003366] text-white sticky top-0 z-1001 shadow-lg">
         <div className="w-full px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -191,7 +184,7 @@ export default function App() {
               Filter Berdasarkan Layanan:
             </label>
 
-            {/* Kontainer Dropdown */}
+            {/* Wadah Dropdown */}
             <div className="relative group w-full md:w-72">
               <button
                 className="bg-white text-gray-900 text-sm rounded-lg flex items-center justify-between w-full p-2.5 outline-none shadow-inner"
@@ -266,7 +259,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Trip Filter dan Dropdown */}
+            {/* Filter Trip dan Dropdown */}
             <label className="hidden sm:inline text-sm font-medium text-blue-100">
               Filter Berdasarkan Trip:
             </label>
@@ -293,7 +286,7 @@ export default function App() {
                 </svg>
               </button>
 
-              {/* Konten Dropdown */}
+              {/* Isi Dropdown */}
               <div
                 ref={patternDropdownRef}
                 className="absolute right-0 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-9999 max-h-80 overflow-y-auto"
@@ -350,7 +343,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* DASBOR */}
+      {/* DASHBOARD */}
       <main className="w-full px-8 py-10 grow">
         {showErrorBanner && (vehiclesError || routesError || patternsError) && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-start justify-between gap-4">

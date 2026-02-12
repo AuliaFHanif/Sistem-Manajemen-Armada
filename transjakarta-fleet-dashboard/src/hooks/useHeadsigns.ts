@@ -28,7 +28,7 @@ export const useHeadsigns = (routeIds: string[] = []) => {
       try {
         setLoading(true);
 
-        // Fetch ALL trips by paginating until we get them all
+        // Ambil SEMUA trip dengan paginating sampai kita mendapatkan semuanya
         let allTrips: MBTATrip[] = [];
         let offset = 0;
         const limit = 100;
@@ -47,19 +47,16 @@ export const useHeadsigns = (routeIds: string[] = []) => {
             allTrips = [...allTrips, ...response.data];
             offset += limit;
 
-            // Stop if we got fewer results than requested (last page)
             if (response.data.length < limit) {
               hasMore = false;
             }
 
-            // Safety limit: stop after 1000 trips to avoid infinite loops
             if (allTrips.length >= 1000) {
               hasMore = false;
             }
           }
         }
 
-        // Group trips by headsign + direction
         const patternMap = new Map<string, TripPattern>();
 
         allTrips.forEach((trip: MBTATrip) => {
@@ -78,7 +75,6 @@ export const useHeadsigns = (routeIds: string[] = []) => {
             });
           }
 
-          // Add this trip ID to the pattern
           patternMap.get(key)!.tripIds.push(trip.id);
         });
 
