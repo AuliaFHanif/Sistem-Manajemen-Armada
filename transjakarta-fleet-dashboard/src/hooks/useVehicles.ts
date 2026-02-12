@@ -6,6 +6,7 @@ export const useVehicles = (
   limit = 10,
   routeIds: string[] = [],
   tripIds: string[] = [],
+  applyTripFilter = true,
 ) => {
   const [vehicles, setVehicles] = useState<MBTAVehicle[]>([]);
   const [included, setIncluded] = useState<MBTAIncluded[]>([]);
@@ -20,7 +21,25 @@ export const useVehicles = (
 
         let response;
 
-        if (tripIds.length > 0) {
+        // Handle special "no trip" filter
+        if (applyTripFilter && tripIds.includes("NO_TRIP")) {
+          // Get all vehicles for route, then filter client-side for no trip
+          response = await mbtaService.fetchVehiclesByRoute(routeIds);
+          response = {
+            ...response,
+            data: response.data.filter((v) => !v.relationships.trip.data?.id),
+          };
+        } else if (applyTripFilter && tripIds.includes("NONREV")) {
+          // Handle non-revenue trips filter
+          response = await mbtaService.fetchVehiclesByRoute(routeIds);
+          response = {
+            ...response,
+            data: response.data.filter((v) => {
+              const tripId = v.relationships.trip.data?.id;
+              return tripId && tripId.startsWith("NONREV");
+            }),
+          };
+        } else if (applyTripFilter && tripIds.length > 0) {
           response = await mbtaService.fetchVehiclesByTrip(tripIds);
         } else if (routeIds.length > 0) {
           response = await mbtaService.fetchVehiclesByRoute(routeIds);
@@ -43,7 +62,7 @@ export const useVehicles = (
         if (isInitial) setLoading(false);
       }
     },
-    [limit, routeIds, tripIds],
+    [limit, JSON.stringify(routeIds), JSON.stringify(tripIds), applyTripFilter],
   );
 
   useEffect(() => {
